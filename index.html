@@ -1,134 +1,218 @@
+<!-- Исправь всё заново -->
 <!DOCTYPE html>
-<html lang="ru">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PUZZLE Chaos Screensaver</title>
-    <style>
-      html,
-      body {
-        margin: 0;
-        padding: 0;
-        height: 100%;
-        background: #000;
-        overflow: hidden;
+<html lang='ru'>
+<head>
+<meta charset='UTF-8' />
+<title>Tetris</title>
+<meta name='viewport' content='width=device-width, initial-scale=1.0'>
+<style>
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  background:#111;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  height:100vh;
+  color:#fff;
+  font-family:sans-serif;
+  overflow:hidden;
+}
+#score{position:absolute;top:20px;left:20px;font-size:22px;}
+canvas{border:4px solid #555;border-radius:12px;background:#222;}
+#msg{
+  position:absolute;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  font-size:64px;
+  font-weight:bold;
+  color:#ff3333;
+  pointer-events:none;
+  opacity:0;
+  visibility:hidden;
+  transition:opacity .2s;
+}
+</style>
+</head>
+<body>
+<div id='score'>0</div>
+<canvas id='game' width='300' height='600'></canvas>
+<div id='msg'>GAME&nbsp;OVER</div>
+
+<script>
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+const scoreEl=document.getElementById('score');
+const msg=document.getElementById('msg');
+
+const COLS=10,ROWS=20,SIZE=30;
+const COLORS=['#00f0f0','#0000f0','#f0a000','#f0f000','#00f000','#a000f0','#f00000'];
+const SHAPES=[
+  [[1,1,1,1]],
+  [[1,0,0],[1,1,1]],
+  [[0,0,1],[1,1,1]],
+  [[1,1],[1,1]],
+  [[0,1,1],[1,1,0]],
+  [[0,1,0],[1,1,1]],
+  [[1,1,0],[0,1,1]]
+];
+
+const SPEED_NORMAL=800;
+const SPEED_FAST  =400;
+
+let board,cur,score,dropCounter,dropInterval,lastTime,gameOver;
+
+function reset(){
+  board=Array.from({length:ROWS},()=>Array(COLS).fill(0));
+  score=0;
+  updateScore();
+  cur=newPiece();
+  dropCounter=0;
+  dropInterval=SPEED_NORMAL;
+  lastTime=0;
+  gameOver=false;
+  msg.style.visibility='hidden';
+  msg.style.opacity='0';
+  requestAnimationFrame(update);
+}
+
+function newPiece(){
+  const id=Math.floor(Math.random()*SHAPES.length);
+  return{matrix:SHAPES[id],color:COLORS[id],x:3,y:0};
+}
+
+function rotate(m){
+  const res=[];
+  for(let x=0;x<m[0].length;x++){
+    res.push([]);
+    for(let y=m.length-1;y>=0;y--)res[x].push(m[y][x]);
+  }
+  return res;
+}
+
+function collide(mat,offX,offY){
+  for(let y=0;y<mat.length;y++){
+    for(let x=0;x<mat[y].length;x++){
+      if(!mat[y][x])continue;
+      const ny=y+offY,nx=x+offX;
+      if(nx<0||nx>=COLS||ny>=ROWS) return true;
+      if(ny>=0 && board[ny][nx]) return true;
+    }
+  }
+  return false;
+}
+
+function merge(){
+  cur.matrix.forEach((row,y)=>{
+    row.forEach((v,x)=>{
+      if(v){
+        const ny=y+cur.y,nx=x+cur.x;
+        if(ny>=0) board[ny][nx]=cur.color;
       }
+    });
+  });
+}
 
-      #scene {
-        position: relative;
-        width: 100%;
-        height: 100%;
-        perspective: 1000px;
-      }
+function showLinesCleared(){
+  msg.textContent='LINE!';
+  msg.style.visibility='visible';
+  msg.style.opacity='1';
+  setTimeout(()=>msg.style.opacity='0',400);
+}
 
-      .word {
-        position: absolute;
-        font-family: "Arial Black", sans-serif;
-        font-size: 15vw;
-        line-height: 1;
-        white-space: nowrap;
-        transform-style: preserve-3d;
-        will-change: transform;
-      }
+function updateSpeed(){
+  if(score>=1000)dropInterval=SPEED_FAST;
+}
 
-      .char {
-        display: inline-block;
-        text-shadow: 0 0 30px #fff;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="scene">
-      <div class="word">ПУЗЯ Говнюк</div>
-    </div>
+function clearLines(){
+  let lines=0;
+  outer:for(let y=ROWS-1;y>=0;y--){
+    for(let x=0;x<COLS;x++)if(!board[y][x])continue outer;
+    board.splice(y,1);
+    board.unshift(Array(COLS).fill(0));
+    lines++;y++;
+  }
+  if(lines){
+    score+=lines*100;
+    updateScore();
+    updateSpeed();
+    showLinesCleared();
+  }
+}
 
-    <script>
-      const word = document.querySelector('.word');
-      const originalText = word.textContent.trim();
-      // Оборачиваем каждую букву в span для индивидуальной окраски
-      word.innerHTML = [...originalText].map(ch => `<span class="char">${ch}</span>`).join('');
-      const chars = word.querySelectorAll('.char');
+function updateScore(){scoreEl.textContent=score;}
 
-      // Функция генерации случайного яркого цвета
-      function randomColor() {
-        return `hsl(${Math.floor(Math.random()*360)}deg, 100%, 60%)`;
-      }
+function drawCell(x,y,color){ctx.fillStyle=color;ctx.fillRect(x*SIZE,y*SIZE,SIZE-1,SIZE-1);}    
 
-      // Начальная раскраска символов
-      chars.forEach(c => {
-        const col = randomColor();
-        c.style.color = col;
-        c.style.textShadow = `0 0 20px ${col}`;
-      });
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  board.forEach((row,y)=>row.forEach((v,x)=>{if(v)drawCell(x,y,v);}));
+  cur.matrix.forEach((row,y)=>row.forEach((v,x)=>{
+    if(v){
+      const ny=y+cur.y,nx=x+cur.x;
+      if(ny>=0) drawCell(nx,ny,cur.color);
+    }
+  }));
+}
 
-      let w = word.offsetWidth;
-      let h = word.offsetHeight;
+function gameOverAlert(){
+  gameOver=true;
+  msg.textContent='Ты\u00A0лох!\nR\u00A0–\u00A0restart';
+  msg.style.visibility='visible';
+  msg.style.opacity='1';
+}
 
-      let px = Math.random() * (window.innerWidth - w);
-      let py = Math.random() * (window.innerHeight - h);
+function drop(){
+  cur.y++;
+  if(collide(cur.matrix,cur.x,cur.y)){
+    cur.y--;
+    merge();
+    if(board[0].some(v=>v)){
+      draw();
+      gameOverAlert();
+      return;
+    }
+    clearLines();
+    cur=newPiece();
+    if(collide(cur.matrix,cur.x,cur.y)){
+      draw();
+      gameOverAlert();
+      return;
+    }
+  }
+  dropCounter=0;
+}
 
-      let vx = (Math.random() * 2 - 1) * 2.5;
-      let vy = (Math.random() * 2 - 1) * 2.5;
+function update(time=0){
+  const delta=time-lastTime;lastTime=time;dropCounter+=delta;
+  if(dropCounter>dropInterval&&!gameOver)drop();
+  draw();
+  if(!gameOver)requestAnimationFrame(update);
+}
 
-      let rx = 0, ry = 0, rz = 0;
-      let vrx = (Math.random() * 2 - 1) * 1;
-      let vry = (Math.random() * 2 - 1) * 1;
-      let vrz = (Math.random() * 2 - 1) * 1;
+document.addEventListener('keydown',e=>{
+  if(gameOver){
+    if(e.code==='KeyR')reset();
+    return;
+  }
+  if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code))e.preventDefault();
+  switch(e.code){
+    case 'ArrowLeft':
+      if(!collide(cur.matrix,cur.x-1,cur.y))cur.x--;break;
+    case 'ArrowRight':
+      if(!collide(cur.matrix,cur.x+1,cur.y))cur.x++;break;
+    case 'ArrowUp':{
+      const rot=rotate(cur.matrix);
+      if(!collide(rot,cur.x,cur.y))cur.matrix=rot;break;
+    }
+    case 'ArrowDown':drop();break;
+    case 'Space':
+      while(!collide(cur.matrix,cur.x,cur.y+1))cur.y++;
+      drop();break;
+  }
+});
 
-      function resize() {
-        w = word.offsetWidth;
-        h = word.offsetHeight;
-      }
-      window.addEventListener('resize', resize);
-
-      function step() {
-        // Перемещение
-        px += vx;
-        py += vy;
-
-        // Отскок от границ
-        if (px < 0 || px > window.innerWidth - w) {
-          vx *= -1;
-          px = Math.max(0, Math.min(px, window.innerWidth - w));
-        }
-        if (py < 0 || py > window.innerHeight - h) {
-          vy *= -1;
-          py = Math.max(0, Math.min(py, window.innerHeight - h));
-        }
-
-        // Случайная корректировка скоростей для хаотичности
-        if (Math.random() < 0.01) {
-          vx = (Math.random() * 2 - 1) * 2.5;
-          vy = (Math.random() * 2 - 1) * 2.5;
-        }
-
-        // Вращение
-        rx += vrx;
-        ry += vry;
-        rz += vrz;
-
-        if (Math.random() < 0.02) {
-          vrx = (Math.random() * 2 - 1) * 1;
-          vry = (Math.random() * 2 - 1) * 1;
-          vrz = (Math.random() * 2 - 1) * 1;
-        }
-
-        // Применяем трансформацию
-        word.style.transform = `translate3d(${px}px, ${py}px, 0) rotateX(${rx}deg) rotateY(${ry}deg) rotateZ(${rz}deg)`;
-
-        // Периодически перекрашиваем каждую букву
-        if (Math.random() < 0.05) {
-          chars.forEach(c => {
-            const col = randomColor();
-            c.style.color = col;
-            c.style.textShadow = `0 0 20px ${col}`;
-          });
-        }
-
-        requestAnimationFrame(step);
-      }
-
-      step();
-    </script>
-  </body>
+reset();
+</script>
+</body>
 </html>
