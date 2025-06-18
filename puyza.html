@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PUZZLE Chaos Screensaver</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: #000;
+        overflow: hidden;
+      }
+
+      #scene {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        perspective: 1000px;
+      }
+
+      .word {
+        position: absolute;
+        font-family: "Arial Black", sans-serif;
+        font-size: 15vw;
+        line-height: 1;
+        white-space: nowrap;
+        transform-style: preserve-3d;
+        will-change: transform;
+      }
+
+      .char {
+        display: inline-block;
+        text-shadow: 0 0 30px #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="scene">
+      <div class="word">ПУЗЯ Говнюк</div>
+    </div>
+
+    <script>
+      const word = document.querySelector('.word');
+      const originalText = word.textContent.trim();
+      // Оборачиваем каждую букву в span для индивидуальной окраски
+      word.innerHTML = [...originalText].map(ch => `<span class="char">${ch}</span>`).join('');
+      const chars = word.querySelectorAll('.char');
+
+      // Функция генерации случайного яркого цвета
+      function randomColor() {
+        return `hsl(${Math.floor(Math.random()*360)}deg, 100%, 60%)`;
+      }
+
+      // Начальная раскраска символов
+      chars.forEach(c => {
+        const col = randomColor();
+        c.style.color = col;
+        c.style.textShadow = `0 0 20px ${col}`;
+      });
+
+      let w = word.offsetWidth;
+      let h = word.offsetHeight;
+
+      let px = Math.random() * (window.innerWidth - w);
+      let py = Math.random() * (window.innerHeight - h);
+
+      let vx = (Math.random() * 2 - 1) * 2.5;
+      let vy = (Math.random() * 2 - 1) * 2.5;
+
+      let rx = 0, ry = 0, rz = 0;
+      let vrx = (Math.random() * 2 - 1) * 1;
+      let vry = (Math.random() * 2 - 1) * 1;
+      let vrz = (Math.random() * 2 - 1) * 1;
+
+      function resize() {
+        w = word.offsetWidth;
+        h = word.offsetHeight;
+      }
+      window.addEventListener('resize', resize);
+
+      function step() {
+        // Перемещение
+        px += vx;
+        py += vy;
+
+        // Отскок от границ
+        if (px < 0 || px > window.innerWidth - w) {
+          vx *= -1;
+          px = Math.max(0, Math.min(px, window.innerWidth - w));
+        }
+        if (py < 0 || py > window.innerHeight - h) {
+          vy *= -1;
+          py = Math.max(0, Math.min(py, window.innerHeight - h));
+        }
+
+        // Случайная корректировка скоростей для хаотичности
+        if (Math.random() < 0.01) {
+          vx = (Math.random() * 2 - 1) * 2.5;
+          vy = (Math.random() * 2 - 1) * 2.5;
+        }
+
+        // Вращение
+        rx += vrx;
+        ry += vry;
+        rz += vrz;
+
+        if (Math.random() < 0.02) {
+          vrx = (Math.random() * 2 - 1) * 1;
+          vry = (Math.random() * 2 - 1) * 1;
+          vrz = (Math.random() * 2 - 1) * 1;
+        }
+
+        // Применяем трансформацию
+        word.style.transform = `translate3d(${px}px, ${py}px, 0) rotateX(${rx}deg) rotateY(${ry}deg) rotateZ(${rz}deg)`;
+
+        // Периодически перекрашиваем каждую букву
+        if (Math.random() < 0.05) {
+          chars.forEach(c => {
+            const col = randomColor();
+            c.style.color = col;
+            c.style.textShadow = `0 0 20px ${col}`;
+          });
+        }
+
+        requestAnimationFrame(step);
+      }
+
+      step();
+    </script>
+  </body>
+</html>
